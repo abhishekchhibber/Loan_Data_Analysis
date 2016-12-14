@@ -1,0 +1,875 @@
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(echo=FALSE, warning=FALSE, message=FALSE)
+```
+
+ANALYSIS OF PROSPER LOAN DATA by ABHISHEK CHHIBBER
+========================================================
+***
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, packages}
+# Load all of the packages that you end up using
+# in your analysis in this code chunk.
+
+# Notice that the parameter "echo" was set to FALSE for this code chunk.
+# This prevents the code from displaying in the knitted HTML output.
+# You should set echo=FALSE for all code chunks in your file.
+
+library(ggplot2)
+library(dplyr)
+library(knitr)
+```
+
+
+```{r echo=FALSE, Load_the_Data}
+#Reading csv
+
+df <- read.csv('prosperLoanData.csv')
+
+```
+## About the Project
+
+#### In this project, I have analysed loan payments and defaults of a dataset,
+#### containing details of 113,937 loans. 
+
+## Libraries Used:
+* ggplot2
+* dplyr
+* knitr
+
+# data.frame columns:
+
+```{r echo=FALSE,message=FALSE, warning=FALSE}
+stru <- str(df)
+stru
+```
+
+# Summary of few variables:
+
+### Borrowers' rate of interest
+```{r echo=FALSE,message=FALSE, warning=FALSE}
+br_int <- summary(df$BorrowerRate)
+br_int
+
+```
+
+
+### Borrowers' income range
+```{r echo=FALSE,message=FALSE, warning=FALSE}
+br_inc_range <- summary(df$IncomeRange)
+br_inc_range
+
+```
+
+
+
+### Amount of loan
+```{r echo=FALSE,message=FALSE, warning=FALSE}
+loan_amt <- summary(df$LoanOriginalAmount)
+loan_amt
+
+```
+
+
+
+
+# Univariate Plots Section
+
+
+
+#### Figure 1: Loans by terms
+
+```{r echo=FALSE, warning=FALSE, message=FALSE, Figure_1}
+df$Term <- factor(df$Term)
+fig_1 <-  ggplot(data = df, aes(x = Term ))+ geom_bar() + geom_text(stat='Count',aes(label=..count..),vjust=0)
+fig_1
+
+```
+
+
+
+> Majority of the loans are of 36-month term, followed by those with 60-month term.
+
+
+
+#### Figure 2: Loans by Loan Status 
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,Figure_2}
+
+status_df <- df %>%
+  group_by(LoanStatus) %>%
+  mutate(unique_types = n_distinct(LoanStatus))
+
+fig_2 <- ggplot(data = status_df, aes(x = LoanStatus, y = unique_types ))+
+  geom_col()+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))+
+  ggtitle("Count of loan status in our dataset")+ 
+  labs(x="Status of loans",y="Number of loans")
+
+fig_2
+```
+
+
+
+> Majority of the loans are either current or completed
+
+
+
+
+#### Figure 3: Loans by Borrower's Occupation (Top-10)
+
+```{r echo=FALSE, warning=FALSE, message=FALSE, Figure_3}
+df_occu <- data.frame(aggregate(ListingKey ~ Occupation, df, function(x)                                length(unique(x, na.rm = TRUE)), na.action = na.pass))
+# creates a dataframe with listing (count) and occupation
+df_occu <- df_occu %>%
+  select(Occupation, ListingKey) %>%
+  arrange(desc(ListingKey))
+# Arrange by descending order
+df_occu<-subset(df_occu, Occupation != "",select = c(Occupation, ListingKey))
+df_occu<-subset(df_occu,Occupation != "Other",select = c(Occupation, ListingKey))
+#removes the blank cell and 'Other'
+fig_3 <- ggplot(data = df_occu[1:10,], aes(x = Occupation, y = ListingKey))+
+  geom_col()+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+# selecting top 10 professions by count
+
+
+
+fig_3
+
+```
+
+
+
+> Professionals, Computer Programmers, and Executives are the major loan takers. 
+
+
+
+
+
+#### Figure 4: Loans by Borrower's employment status
+
+```{r echo=FALSE, warning=FALSE, message=FALSE, figure_4}
+empl <- data.frame(aggregate(ListingKey ~ EmploymentStatus, df, 
+                             function(x) length(unique(x))))
+# creates a dataframe with listing (count) and Employment Status
+empl <- subset(empl, EmploymentStatus != "" , 
+               select = c(EmploymentStatus, ListingKey))
+#removes the blank cell
+fig_4 <- ggplot(data = empl, aes(x = EmploymentStatus, y = ListingKey))+
+  geom_col()+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+fig_4
+```
+
+
+
+> Majority of the loan takers are employed, or have full-time employment
+
+### Checking if the borrower is home owner
+
+
+#### Figure 5: % of loan takers as home owners
+
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,figure_5}
+home_ow <- data.frame(aggregate(ListingKey ~ IsBorrowerHomeowner,df,
+                                function(x) length(unique(x))))
+pct <- round(home_ow$ListingKey/sum(home_ow$ListingKey)*100, digits = 2)
+lbls <- paste(home_ow$IsBorrowerHomeowner, pct) # add percents to labels 
+lbls <- paste(lbls,"%",sep="") # ad % to labels 
+
+
+fig_5 <- pie(home_ow$ListingKey,labels = lbls, 
+             col=rainbow(length(home_ow$IsBorrowerHomeowner)),
+             main="Loan takers as home owners")
+
+
+
+```
+
+
+
+> Ratio of home owners to non-home owners is almost equal
+
+
+### Number of applicants having prior loans
+
+#### Figure 6: % of Borrowers having prior loans
+
+```{r echo=FALSE, warning=FALSE, message=FALSE, figure_6}
+
+total_entries <- length(df$TotalProsperLoans)
+have_loans <- sum(is.na(df$TotalProsperLoans))
+no_loans <- total_entries - have_loans
+
+loan_status <- data.frame(categories = c("Prior Loans","No Prior Loans"), 
+                          Values = c(have_loans, no_loans))
+
+pct <- round(loan_status$Values/sum(loan_status$Values)*100, digits = 2)
+lbls <- paste(loan_status$categories, pct) # add percents to labels 
+lbls <- paste(lbls,"%",sep="") # add % to labels 
+
+
+fig_6 <- pie(loan_status$Values,labels = lbls, 
+             col=rainbow(length(loan_status$Values)), 
+             main="Borrowers having prior loans")
+
+
+```
+
+
+
+> 80.62% of the borrowers had prior loans
+
+
+
+#### Figure 7: Monthly loan payments by borrowers
+```{r echo=FALSE, warning=FALSE, message=FALSE,figure_7}
+fig_7 <- ggplot(data = df, aes(x = MonthlyLoanPayment))+
+  geom_histogram(binwidth = 100)
+  
+fig_7
+
+```
+
+> Majority of the monthly loan payments are in the range 200-300
+
+
+#### Figure 8: Plot after removing outliers
+
+```{r echo=FALSE,warning=FALSE, message=FALSE, figure_8}
+fig_8 <- ggplot(data = df, aes(x = MonthlyLoanPayment))+
+  geom_histogram(binwidth = 100)+
+  coord_cartesian(xlim = c(0, 1000))
+  
+fig_8
+
+```
+
+
+
+
+
+
+
+# Univariate Analysis
+
+### What is the structure of your dataset?
+
+The dataset contains details on 113,937 loans, across 81 variables. 
+The variables are numeric, string, as well as factors.
+
+The dataset is not cleaned, and had to be wrangled upon, during analysis. 
+
+
+
+### What is/are the main feature(s) of interest in your dataset?
+
+The main features of interest are the different variables, 
+which directly or indirect play role in loan taking and paying capacity of a 
+borrower. I'd like to check the relationship between different variables, 
+as well as between variables and loan payments and defaults. 
+
+
+
+### What other features in the dataset do you think will help support your investigation into your feature(s) of interest?
+
+Some of the variables were processed and simplified into new variables, to use 
+them as ordered factors. E.g. There is a variable of stated monthly income 
+that provides discrete income of all the borrowers, and another variable of 
+income range, which provides bins of income, to be used as a factor. 
+
+### Did you create any new variables from existing variables in the dataset?
+
+Besides the 81 already existing variable, 'OnTimePaymentsDefaults'. This is 
+subtraction of 'OnTimeProsperPayments' from 'TotalProsperPaymentsBilled', 
+and sepicts the prosper payments billed, and not paid. This variable was 
+created to find the loans/borrowers which had defaulted, and compare them 
+on several other variables - in multivariate analysis. 
+
+### Of the features you investigated, were there any unusual distributions? Did you perform any operations on the data to tidy, adjust, or change the form of the data? If so, why did you do this?
+
+The dataset was not tidy, and I had to do some data wrangling to use it. 
+Though I did not change the data to log etc, I worked on creating ordered 
+factors, cleaning out Null and NA data, and assigning 
+new values through conditions. 
+
+
+# Bivariate Plots Section
+
+
+### Checking if the income stated by borrower is correct
+
+Following chart studies the relationship between 'Income Range' and 
+'Stated Monthly Income' to check if data in both the columns is matching
+
+#### Figure 9: Stated monthly income of borrowers, by income range
+
+```{r echo=FALSE, warning=FALSE, message=FALSE, figure_9}
+fig_9 <- ggplot(data = df, aes(y = IncomeRange, x = (StatedMonthlyIncome*12)))+
+  geom_point()
+
+fig_9
+```
+
+
+
+> There are very few outliers, when comparing income range and stated monthly income.
+
+
+Scatter plot of monthly income and monthly loan payments
+
+#### Figure 10: Relationship between stated monthly income and monthly loan payment (1)
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,figure_10}
+fig_10 <- ggplot(data = df, aes(y = MonthlyLoanPayment, x = StatedMonthlyIncome))+
+  geom_point()
+
+fig_10
+
+```
+
+
+Scatter plot with outliers removed and alpha decreased to get the following plot:
+
+#### Figure 11: Relationship between stated monthly income and monthly loan payment (2)
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,figure_11}
+fig_11 <- ggplot(data = df, aes(y = MonthlyLoanPayment, x = StatedMonthlyIncome))+
+  geom_jitter(alpha = 0.2)+
+  coord_cartesian(xlim = c(0, 25000), ylim = c(0, 2000)) 
+
+fig_11
+```
+
+
+
+> Majority of borrowers with monthly income of upto $10,000 pay monthly loan payment of upto $1,000.
+
+Individual debt to income ratio for all the income ranges 
+
+#### Figure 12: Relationship between Debt to Income Ratio and Income Range (1)
+
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,figure_12}
+fig_12 <- ggplot(data = df,aes(y = IncomeRange,x = DebtToIncomeRatio,
+                               na.rm=TRUE))+
+  geom_jitter(alpha = 0.2)
+
+fig_12
+
+```
+
+
+Consistancy of data checked further through a box plot
+
+
+#### Figure 13: Relationship between Debt to Income Ratio and Income Range (2)
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,figure_13}
+
+fig_13 <- ggplot(data = df, aes(x = IncomeRange, y =DebtToIncomeRatio ))+
+  geom_boxplot()+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+
+fig_13
+
+```
+
+
+
+> Some of the ranges have high whiskers, which shows a lot of data points above upper quartile.
+
+
+Therefore, rather than mean, median debt to income ratio for all income ranges was plotted
+
+#### Figure 14: Relationship between median Debt to Income Ratio and Income Range
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,figure_14}
+new_df <- df %>%
+  group_by(IncomeRange) %>%
+  summarise(med_DIR = median(DebtToIncomeRatio, na.rm=TRUE))
+
+
+fig_14 <- ggplot(data = new_df, aes(x = IncomeRange, y =med_DIR ))+
+  geom_bar(stat = "identity")+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+fig_14
+```
+
+
+
+> The median debt to income ratio is higher for borrowers who are unemployed, or have income less than $25,000
+
+
+
+### Borrower payment success rate 
+
+First, proportion of ontime payments that borrowers made, out of the 
+prosper payments billed was analyzed
+
+#### Figure 15: % of loan payments made and remaining 
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,figure_15}
+
+payments_billed <-  sum(df$TotalProsperPaymentsBilled, na.rm=TRUE)
+payments_made <- sum(df$OnTimeProsperPayments, na.rm=TRUE)
+payments_made_pct <- round((payments_made/payments_billed)*100, digits = 2)
+Payments_remaining <- payments_billed - payments_made
+payments_remaining_pct <- round((Payments_remaining/payments_billed)*100, 
+                                digits = 2)
+
+slices <- c(payments_made_pct, payments_remaining_pct)
+lbls <- c("Made", "Remaining")
+lbls <- paste(lbls, ":",slices)
+lbls <- paste(lbls,"%",sep="")
+fig_15 <- pie(slices, labels = lbls, col=rainbow(2), 
+              main="Loan payments made and remaining")
+
+
+
+
+
+```
+
+
+> 97.11% of the borrowers made their payments in time
+
+
+
+Loan payments made and defaulted were analyzed, and categorized by income range.
+
+#### Figure 16: Loan defaulters and non-defaulters by income range
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,figure_16}
+df$OnTimePaymentsDefaults <- df$TotalProsperPaymentsBilled - 
+  df$OnTimeProsperPayments
+# creating a new variable for payment defaults
+
+df1 <- data.frame(df$OnTimePaymentsDefaults, df$TotalProsperPaymentsBilled, df$OnTimeProsperPayments, df$IncomeRange)
+df1 <- df1[!is.na(df1$df.OnTimePaymentsDefaults),]
+
+#creating a new dataframe with only the relevant columns, 
+# and removing the rows with Null values
+
+df1$df.IncomeRange <- ordered(df1$df.IncomeRange, levels = 
+                                c("Not employed", "$1-24,999", "$25,000-49,999", "$50,000-74,999", "$75,000-99,999", "$100,000+", "(Other)"))
+
+
+
+
+df1$isDefaulter <- 0
+df1$isDefaulter[df1$df.OnTimePaymentsDefault > 0] <- 'defaulters'
+df1$isDefaulter[df1$df.OnTimePaymentsDefault <= 0] <- 'non_defaulters'
+df1$isDefaulter <- factor(df1$isDefaulter)
+  
+
+fig_16 <- ggplot(data = df1, aes(df.IncomeRange, fill = df1$isDefaulter,)) +
+  geom_histogram(stat="count")+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+  
+fig_16  
+  
+```
+
+
+
+
+> There is no clear relation between number / % of defaulters and income range of borrowers 
+
+
+# Bivariate Analysis
+
+### Talk about some of the relationships you observed in this part of the investigation. How did the feature(s) of interest vary with other features in the dataset?
+
+* Majority of borrowers with monthly income of up to $10,000 pay monthly loan payment of up to $1,000.
+* The debt-income ratio is not normally distributed. In the box-plot of debt-income and income range, size of the boxes were very small with high whiskers - which shows a lot of data points outside the first and third quartile.
+* 97.11% of the borrowers made their payments in time, while only 2.89% defaulted.
+
+
+
+### Did you observe any interesting relationships between the other features (not the main feature(s) of interest)?
+
+
+Borrowers who are unemployed, or have income less than $25,000 - have higher median debt-income ratio, as compared to those having income above $25,000.
+
+### What was the strongest relationship you found?
+
+Strongest relationship was between borrowers' stated monthly income and their monthly loan payments, where majority of borrowers with monthly income of up to $10,000 paid monthly loan payment of up to $1000 only.
+
+
+# Multivariate Plots Section
+
+
+### Analyzing relationship between income range and loan defaults 
+
+
+
+Relationship between income range and loans defaulted were analyzed, and categorized by prosper score.
+
+#### Figure 17: Loan defaulters by income range and prosper score (1)
+
+
+```{r echo=FALSE, warning=FALSE, message=FALSE, figure_17}
+
+# Creating df$ProsperScore and df$IncomeRange as an ordered factors
+df$ProsperScore <- ordered(df$ProsperScore, levels = c(1,2,3,4,5,6,7,8,9,10))
+
+df$IncomeRange <- ordered(df$IncomeRange, levels = c("Not employed", "$1-24,999", "$25,000-49,999", "$50,000-74,999", "$75,000-99,999", "$100,000+", "(Other)"))
+
+
+df2 <- df[!is.na(df$ProsperScore),]
+
+fig_17 <- ggplot(data = df2, aes(x = IncomeRange, y = OnTimePaymentsDefaults))+
+    geom_boxplot(aes(fill = factor(ProsperScore)))+
+    scale_fill_brewer(palette = "Spectral") +
+    scale_y_log10(breaks=c(1,10,20,40)) + coord_flip()
+
+
+fig_17
+
+```
+
+
+
+
+Relationship between income range and loans defaulted were analyzed, and categorized by prosper score through facets.
+
+#### Figure 18: Loan defaulters by income range and prosper score (2)
+
+```{r echo=FALSE, warning=FALSE, message=FALSE, figure_18}
+
+fig_18 <- ggplot(data = df2, aes(y = IncomeRange, x = OnTimePaymentsDefaults, 
+                                 na.rm = TRUE))+
+  geom_boxplot(size = 1, na.rm = TRUE)+
+  facet_wrap( ~ ProsperScore)
+
+
+fig_18
+
+
+```
+
+
+
+> Number of defaulted loans are higher in the income range $50,000 - $100,000 and the prosper score does not has any clear relation with defaults and income range.
+
+
+### Analyzing relationship between prior loans and loan defaults, and cetegorized by prosper scores 
+
+#### Figure 19: Loan defaulters by total loans and prosper score (1)
+```{r echo=FALSE,  warning=FALSE, message=FALSE,figure_19}
+
+
+fig_19 <- ggplot(data = df2, aes(x = factor(TotalProsperLoans), 
+                                 y = OnTimePaymentsDefaults,
+                                 nm.rm = T))+
+  geom_boxplot(aes(fill = factor(ProsperScore)))+
+    scale_fill_brewer(palette = "Spectral") +
+    scale_y_log10(breaks=c(1,10,20,40)) + 
+  coord_flip()
+  
+
+
+fig_19
+
+```
+
+
+Analyzing the data through facets
+
+#### Figure 20: Loan defaulters by total loans and prosper score (2)
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,figure_20}
+fig_20 <- ggplot(data = df2, aes(y = TotalProsperLoans, 
+                                 x = OnTimePaymentsDefaults,  na.rm = TRUE))+
+  geom_point(size = 1, na.rm = TRUE)+
+  facet_wrap( ~ ProsperScore)
+
+fig_20
+
+```
+
+
+Correlation between TotalProsperLoans and OnTimePaymentsDefaults:
+
+```{r echo=FALSE,warning=FALSE, message=FALSE}
+# Correlation between TotalProsperLoans and OnTimePaymentsDefaults
+
+cor_1 <- cor(df2$TotalProsperLoans, df2$OnTimePaymentsDefaults, 
+             use = "complete.obs", method = "pearson")
+
+cor_1
+
+```
+
+
+
+
+>  There are higher loan defaults with higher number of already existing prosper loans, with the correlation coefficient of 0.11.
+
+
+
+
+### Analyzing relationship between Borrowers' income, and the interest rate for loan 
+
+
+
+
+Plotting stated monthly income and borrower rate, and classifying it with term of loan
+
+#### Figure 21: Relation between interest rate and stated monthly income of borrowers, by terms of loans, and regression line
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,figure_21}
+
+fig_21 <- ggplot(data = df, aes(x = StatedMonthlyIncome, y = BorrowerRate))+
+  geom_jitter(alpha = 0.5, aes(colour = factor(Term)))+
+  coord_cartesian(xlim = c(0, 25000), ylim = c(0, 0.4))+
+  geom_smooth(method='lm',formula=y~x)
+
+
+fig_21
+
+```
+
+
+Correlation between StatedMonthlyIncome and BorrowerRate: 
+
+```{r echo=FALSE,warning=FALSE, message=FALSE}
+# Correlation between StatedMonthlyIncome and BorrowerRate 
+
+cor_2 <- cor(df$StatedMonthlyIncome, df$BorrowerRate, 
+             use = "complete.obs", method = "pearson")
+
+cor_2
+
+```
+
+
+
+Substituting stated monthly income with income range
+
+#### Figure 22: Relation between interest rate and income range of borrowers, by terms of loans (1)
+```{r echo=FALSE, warning=FALSE, message=FALSE,figure_22}
+
+fig_22 <- ggplot(data = df, aes(x = IncomeRange, y = BorrowerRate))+
+  geom_jitter(alpha = 0.5, aes(colour = factor(Term)))+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))+
+  coord_cartesian( ylim = c(0, 0.4))
+
+fig_22
+
+```
+
+
+
+Analyzing the data through facets
+
+#### Figure 23: Relation between interest rate and income range of borrowers, by terms of loans (2)
+```{r echo=FALSE, warning=FALSE, message=FALSE,figure_23}
+
+
+fig_23 <- ggplot(data = df, aes(x = IncomeRange, y = BorrowerRate))+
+  geom_boxplot() +
+  facet_wrap( ~ Term) +
+  coord_flip()
+
+
+
+
+
+fig_23
+
+
+
+```
+
+
+
+
+> There is a negative correlation between borrower's stated monthly income, and the rate at which they take loans. 
+> Further, there is no major correlation between income range of borrowers, and the rate at which they take loans.  
+
+
+
+# Multivariate Analysis
+
+### Talk about some of the relationships you observed in this part of the investigation. Were there features that strengthened each other in terms of looking at your feature(s) of interest?
+
+* There is no clear relation between number / % of defaulters and income range of borrowers.
+
+* Number of defaulted loans are higher in the income range $50,000 - $100,000 and the prosper score does not has any clear relation with defaults and income range.
+
+* There are higher loan defaults with higher number of already existing prosper loans, with the correlation coefficient of 0.11.
+
+
+
+### Were there any interesting or surprising interactions between features?
+
+* There is a negative correlation between borrower's stated monthly income, and the rate at which they take loans. 
+
+* Further, there is no major correlation between income range of borrowers, and the rate at which they take loans.  
+
+
+
+### OPTIONAL: Did you create any models with your dataset? Discuss the strengths and limitations of your model.
+
+
+NA
+
+
+------
+
+# Final Plots and Summary
+
+### Plot One (Figure 24)
+
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,Plot_One}
+
+new_df2 <- new_df[!is.na(new_df$IncomeRange),]
+
+
+fig_24 <- ggplot(data = new_df2, aes(x = IncomeRange, y =med_DIR ))+
+  geom_bar(stat = "identity", na.rm = TRUE)+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))+
+  ggtitle("Median Debt-Income Ratio of Borrowers by Income Range") +
+  labs(x="Income Range",y="Median Debt-Income Ratio") 
+
+fig_24
+
+
+
+
+
+```
+
+#### Statistical summary of median debt-income ratio
+```{r echo=FALSE, warning=FALSE, message=FALSE,Plot_One_summary}
+
+summary(new_df2$med_DIR)
+
+```
+
+
+
+
+### Description One
+The median debt-income ratio is higher for lower salary ranges ($1 - $50,000) than higher ranges ($50,000 and more). It shows that for an equal amount of loan, the debt-paying capacity of borrowers with annual income of more than $50,000 is better, as compared to those with lower income.  
+
+
+
+### Plot Two (Figure 25)
+```{r echo=FALSE, warning=FALSE, message=FALSE,Plot_Two}
+
+new_df3 <- df[!is.na(df$IncomeRange),]
+
+fig_25 <- ggplot(data = df, aes(x = IncomeRange, y = BorrowerRate))+
+  geom_boxplot() +
+  facet_wrap( ~ Term) +
+  coord_flip()+
+  ggtitle("Income Range and loan Borrowing Rate, by terms of loans")+ 
+  labs(x="Loan Borrowing Rate",y="Income Range")
+
+fig_25
+
+
+
+
+
+
+```
+
+
+#### Statistical summary of loan borrowing rate
+```{r echo=FALSE, warning=FALSE, message=FALSE,Plot_two_summary}
+
+summary(df$BorrowerRate)
+
+```
+
+
+
+
+### Description Two
+
+The rate of interest is higher for loans with duration 36 months, and less for those with duration of 12 months. Further, there is no major correlation between income range of borrowers, and the rate at which they take loans.  
+
+
+
+
+### Plot Three (Figure 26)
+```{r echo=FALSE,warning=FALSE, message=FALSE, Plot_Three}
+
+new_df4 <- new_df3[!is.na(new_df3$ProsperScore),]
+
+fig_26 <- ggplot(data = df2, aes(x = IncomeRange, y = OnTimePaymentsDefaults))+
+    geom_boxplot(aes(fill = factor(ProsperScore)))+
+    scale_fill_brewer(palette = "Spectral") +
+    scale_y_log10(breaks=c(1,10,20,40)) + coord_flip()+
+  ggtitle("Loan Defaults by Income Range and Prosper Score")+ 
+  labs(x="Loan Payment Defaults",y="Income Range")
+  
+
+fig_26
+
+
+```
+
+
+#### Statistical summary of loan payment defaults
+```{r echo=FALSE, warning=FALSE, message=FALSE,Plot_three_summary_1}
+
+summary(df2$OnTimePaymentsDefaults)
+
+
+```
+
+
+
+> The summary above minimum, 1st quartile and median as 0.00, as majority of
+the loans have 0 payment defaults (borrowers paid on time)
+
+
+#### Calculating number of rows with loan defaults
+```{r echo=FALSE, warning=FALSE, message=FALSE,Plot_three_summary_2}
+
+
+
+full <- length(df2$OnTimePaymentsDefaults)
+
+zero_na_defaults <- length(df2$OnTimePaymentsDefaults[df2$OnTimePaymentsDefaults < 1])
+# removing both 0 and NA
+
+num_defaults <- full-zero_na_defaults
+
+print('Rows with defaults:' )
+num_defaults
+
+
+```
+
+
+### Description Three
+
+Number of loans payments defaults is  higher in the income range above $50,000. However, the figure above shows that box plots of prosper score are almost same for loan payment defaults. Therefore, prosper score does not has any clear relation with defaults and income range.
+
+
+------
+
+# Reflection
+
+In this analysis, I have worked on the Loan Data from Prosper. The dataset had data on 113,937 loans with 81 variables, such as loan amount, borrower rate, current loan status, borrower income, borrower employment status, borrower credit history, and the latest payment information. I used the packages ggplot2 and dplyr for analysis, and knitr for knitting the RMD file to HTML file. 
+
+I started with univariate analysis, by understanding the data through different variables. Then, I selected some of the variables, which I believed could play a substantial direct or indirect role in whether a borrower pays his loans or defaults. Though some variables depicted relationship between them, others did not. 
+
+Finally, I performed multivariate analysis, by selecting borrowers' payment defaults, income range, credit rating (prosper score), earlier loans on them, their monthly income and income range, loan rate of interest and loan term. Through the analysis, I was able to determine some key relationships between two or more variables. 
+
+I faced problems with consistency of data. Values across variables were missing, and I had to perform data wrangling to make the data useful for analysis. Also, the definitions of some of the variables were not clear, and it would have been better if the definitions were more descriptive.
+
+Further, I would like to mention that the relation and correlation among different variables should not be considered as causation. There should be further analysis such as linear regression to study causes and effects in detail.  
+
+
